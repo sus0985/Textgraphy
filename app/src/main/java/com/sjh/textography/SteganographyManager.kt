@@ -1,27 +1,30 @@
 package com.sjh.textography
 
 import android.graphics.Bitmap
-import android.util.Log
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.asSharedFlow
-import java.nio.charset.Charset
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 class SteganographyManager {
 
     private val startMessageConstant = "*&^"
     private val endMessageConstant = "^&*"
 
-    private val _progressFlow = MutableSharedFlow<Int>()
-    val progressFlow = _progressFlow.asSharedFlow()
+    private val _progressFlow = MutableStateFlow(false)
+    val progressFlow = _progressFlow.asStateFlow()
 
-    fun embedTextIntoBitmap(bitmap: Bitmap, text: String): Bitmap {
+    suspend fun embedTextIntoBitmap(bitmap: Bitmap, text: String): Bitmap {
+        _progressFlow.emit(true)
         val embeddedText = startMessageConstant + text + endMessageConstant
+
+        val byte = embeddedText.toByteArray()
+
         val embeddedBitmaps = mutableListOf<Bitmap>()
         val blocks = BitmapUtil.splitImage(bitmap)
         blocks.forEach { block ->
             val embeddedBitmap = embedTextIntoBitmapBlock(block, text)
             embeddedBitmaps.add(embeddedBitmap)
         }
+        _progressFlow.emit(false)
 
         return BitmapUtil.mergeImage(embeddedBitmaps, bitmap.width, bitmap.height)
     }
@@ -37,6 +40,7 @@ class SteganographyManager {
             for (x in 0 until block.width) {
                 val pixel = block.getPixel(x, y)
 
+                val alpha = (pixel shr 24) and 0xFF
                 var red = (pixel shr 16) and 0xFF
                 var green = (pixel shr 8) and 0xFF
                 var blue = pixel and 0xFF
@@ -51,13 +55,21 @@ class SteganographyManager {
                     messageIndex++
                 }
 
-                embeddedBitmap.setPixel(x, y, (red shl 16) or (green shl 8) or blue)
+                embeddedBitmap.setPixel(
+                    x,
+                    y,
+                    (alpha shl 24) or (red shl 16) or (green shl 8) or blue
+                )
             }
         }
 
         embeddedBitmap.density = density
 
         return embeddedBitmap
+    }
+
+    companion object {
+        private const val TAG = "SteganographyManager"
     }
 
 }

@@ -5,24 +5,18 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.gestures.scrollable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.wrapContentHeight
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyGridItemInfo
-import androidx.compose.foundation.lazy.grid.LazyHorizontalGrid
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -35,9 +29,11 @@ import androidx.compose.ui.unit.dp
 
 @Composable
 fun MainScreen(
-    steganographyManager: SteganographyManager
+    viewModel: MainViewModel
 ) {
     val scrollState = rememberScrollState()
+    val uiState = viewModel.uiState.collectAsState().value
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -59,7 +55,8 @@ fun MainScreen(
 
         Button(
             onClick = {
-                val mediaRequest = PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                val mediaRequest =
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                 imagePickerLauncher.launch(mediaRequest)
             }
         ) {
@@ -85,26 +82,30 @@ fun MainScreen(
                 }
             )
 
-            var embeddedBitmap by remember { mutableStateOf<Bitmap?>(null) }
 
             Button(onClick = {
-                embeddedBitmap = steganographyManager.embedTextIntoBitmap(bitmap, text)
+                if (uiState.isWorking) return@Button
+                viewModel.embedTextIntoBitmap(bitmap, text)
             }) {
                 Text("Embedding text")
             }
 
-            embeddedBitmap?.let { bitmap ->
-                Text("Embedded Image")
-                Image(
-                    bitmap = bitmap.asImageBitmap(),
-                    contentDescription = null,
-                    modifier = Modifier
-                        .width(200.dp)
-                        .aspectRatio(1.2f)
-                )
+            with(uiState) {
+                if (isWorking) {
+                    CircularProgressIndicator()
+                }
+
+                embeddedBitmap?.let { bitmap ->
+                    Text("Embedded Image")
+                    Image(
+                        bitmap = bitmap.asImageBitmap(),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .width(200.dp)
+                            .aspectRatio(1.2f)
+                    )
+                }
             }
-
-
         }
     }
 }
